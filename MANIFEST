@@ -1,0 +1,18 @@
+Changes
+COPYING
+lib/Session/Token.pm
+Makefile.PL
+MANIFEST
+MANIFEST.SKIP
+MYMETA.json
+MYMETA.yml
+rand.h
+randport.c
+README
+standard.h
+t/alphabets.t
+t/no-mod-bias.t
+t/reference.t
+Token.xs
+META.yml                                 Module YAML meta-data (added by MakeMaker)
+META.json                                Module JSON meta-data (added by MakeMaker)
