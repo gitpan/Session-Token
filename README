@@ -17,7 +17,7 @@ SYNOPSIS
         ## 4Vez56Zc7el5Ggx4PoXCNL
 
   Custom entropy in bits
-        my $token = Session::Token->new(entropy => 256);
+        my $token = Session::Token->new(entropy => 256)->get;
         ## WdLiluxxZVkPUHsoqnfcQ1YpARuj9Z7or3COA4HNNAv
 
   Custom alphabet and length
@@ -37,10 +37,10 @@ DESCRIPTION
     Once a generator is created, you can repeatedly call the "get" method on
     the generator object and it will return new tokens.
 
-    IMPORTANT: If your application calls "fork", make sure that the
+    IMPORTANT: If your application calls "fork", make sure that any
     generators are re-created in one of the processes after the fork since
-    forking will duplicate the generator state and both parent and child
-    processes will go on to produce identical token streams.
+    forking will duplicate the generator state and otherwise both parent and
+    child processes will go on to produce identical tokens.
 
     ISAAC is a cryptographically secure PRNG that improves on the well known
     RC4 algorithm in some important areas. For instance, it doesn't have
@@ -50,7 +50,7 @@ DESCRIPTION
     ridiculous "2**8295".
 
     After the generator context is created, no system calls are used to
-    generate tokens. This is one way that "Session::Token" helps with
+    generate tokens. This is one way that Session::Token helps with
     efficiency. This is only important for certain use cases (generally not
     web sessions).
 
@@ -178,9 +178,9 @@ MOD BIAS
     problem because ISAAC is extremely fast.
 
     Note that if your application issues biased tokens, then some tokens are
-    more likely than other tokens, providing a decent starting point for
-    token guessing. If the tokens are unbiased, then there is not obvious
-    starting point since all tokens are equally likely.
+    more likely than other tokens, providing a starting point for token
+    guessing. If the tokens are unbiased, then there is no starting point
+    since all tokens are equally likely.
 
 INTRODUCING BIAS
     If your alphabet contains the same character two or more times, this
@@ -203,8 +203,7 @@ INTRODUCING BIAS
     identical, they are discarded. Otherwise the order of the different bits
     is used to determine the output bit, ie 00 and 11 are discarded but 01
     and 10 are mapped to output bits of 0 and 1 respectively. This only
-    works if the bias in each input bit is constant (like in the above
-    example).
+    works if the bias in each bit is constant (like in the above example).
 
 ALPHABET SIZE LIMITATION
     Due to a limitation in this module's code, alphabets can't be larger
@@ -239,8 +238,7 @@ SEEDING
         my $gen = Session::Token(seed => "\x00" x 1024);
 
     This is done in the test-suite, but obviously don't do this in regular
-    applications because the generated token sequences will always be the
-    same.
+    applications because the generated tokens will always be the same.
 
     One valid reason for seeding is if you have some reason to believe that
     there isn't enough entropy in your kernel's randomness pool and
@@ -254,11 +252,12 @@ BUGS
 
     There is currently no way to extract the seed from a Session::Token
     object. Note when implementing this: The saved seed must either store
-    the current state of the isaac round as well as the 1024 byte "randsl"
+    the current state of the ISAAC round as well as the 1024 byte "randsl"
     array or else do some kind of minimum fast forwarding in order to
     protect against a partially duplicated keystream bug.
 
-    Windows isn't currently supported. Meh.
+    Windows isn't currently supported. Meh. Patches welcome though. Should
+    be simple to use Crypt::Random::Source::Strong::Win32.
 
 SEE ALSO
     <The Session::Token github repo>
@@ -274,14 +273,14 @@ SEE ALSO
     Data::Token is the first thing I saw when I looked around on CPAN. It
     has an inflexible and unspecified (?) alphabet. It tries to get its
     source of unpredictability from UUIDs and then hashes these UUIDs with
-    SHA1. I think this is bad design because some UUID standards aren't
+    SHA1. I think this is bad design because some standard UUID formats
     designed to be unpredictable at all. Knowing a target's MAC address and
     the rough time the token was issued may help you predict a reduced area
     of token-space to concentrate guessing attacks upon. I don't know if
     Data::Token uses these types of UUIDs or the (potentially secure) good
     random types, but because this wasn't addressed in the documentation and
     because of an apparent misapplication of hash functions (if you really
-    had a good random UUID type, there would be no reason to hash), I don't
+    had a good random UUID type, there would be no need to hash), I don't
     feel good about using this module.
 
     There are several decent random number generators like
