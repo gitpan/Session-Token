@@ -10,9 +10,11 @@ rand.h
 randport.c
 README
 standard.h
+t/00-system.t
 t/alphabets.t
 t/no-mod-bias.t
 t/reference.t
+t/seed-coverage.t
 Token.xs
 META.yml                                 Module YAML meta-data (added by MakeMaker)
 META.json                                Module JSON meta-data (added by MakeMaker)

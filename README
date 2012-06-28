@@ -30,9 +30,10 @@ DESCRIPTION
     random identifiers, and anything else you can think of.
 
     When a Session::Token object is created, 1024 bytes will be read from
-    "/dev/urandom" (Linux, Solaris, most BSDs) or "/dev/arandom" (some older
-    BSDs). These bytes will be used to seed the <ISAAC-32> pseudo random
-    number generator.
+    "/dev/urandom" (Linux, Solaris, most BSDs), "/dev/arandom" (some older
+    BSDs), or with Crypt::Random::Source::Strong::Win32 (Windows). These
+    bytes will be used to seed the <ISAAC-32> pseudo random number
+    generator.
 
     Once a generator is created, you can repeatedly call the "get" method on
     the generator object and it will return new tokens.
@@ -255,9 +256,6 @@ BUGS
     the current state of the ISAAC round as well as the 1024 byte "randsl"
     array or else do some kind of minimum fast forwarding in order to
     protect against a partially duplicated keystream bug.
-
-    Windows isn't currently supported. Meh. Patches welcome though. Should
-    be simple to use Crypt::Random::Source::Strong::Win32.
 
 SEE ALSO
     <The Session::Token github repo>
