@@ -150,7 +150,7 @@ MOD BIAS
     modulus over the size of an alphabet, and then using this modulus to
     index into the alphabet to determine an output character.
 
-    Why is this bad? Consider the alphabet "abc". An ideal output
+    Why is this bad? Consider the alphabet "abc". The ideal output
     probability distribution for each character in the token is:
 
         P(a) = 1/3
@@ -159,7 +159,7 @@ MOD BIAS
 
     Assume we have a uniform random number source that generates values in
     the set "[0,1,2,3]" (most PRNGs provide sequences of bits, in other
-    words power-of-2 set sizes). If we use the naïve modulus algorithm
+    words power-of-2 size sets). If we use the naïve modulus algorithm
     described above, 0 maps to "a", 1 maps to "b", 2 maps to "c", and 3
     *also* maps to "a". Instead of the even distribution above, we have the
     following biased distribution:
@@ -178,10 +178,10 @@ MOD BIAS
     bytes from the random number generator. This inefficiency isn't a
     problem because ISAAC is extremely fast.
 
-    Note that if your application issues biased tokens, then some tokens are
-    more likely than other tokens, providing a starting point for token
-    guessing. If the tokens are unbiased, then there is no starting point
-    since all tokens are equally likely.
+    Note that if your application issues biased tokens then some tokens are
+    more likely than other tokens which provides a starting point for token
+    guessing. If the tokens are unbiased then all tokens are equally likely
+    and there is no starting point.
 
 INTRODUCING BIAS
     If your alphabet contains the same character two or more times, this
@@ -192,19 +192,20 @@ INTRODUCING BIAS
     However, if you wish to introduce bias this library doesn't try to stop
     you. (Maybe it should issue a warning?)
 
-        Session::Token->new(alphabet => '0000001', length => 100000)->get; # don't do this
+        Session::Token->new(alphabet => '0000001', length => 5000)->get; # don't do this
         ## -> 0000000000010000000110000000000000000000000100...
 
     Due to a limitation discussed below, alphabets larger than 256 aren't
     currently supported so your bias can't get very granular.
 
-    Aside: If you have a biased output stream like the above example then
-    you can re-construct an un-biased bit sequence with the von neumann
-    algorithm. This works by comparing pairs of bits. If the bits are
-    identical, they are discarded. Otherwise the order of the different bits
-    is used to determine the output bit, ie 00 and 11 are discarded but 01
-    and 10 are mapped to output bits of 0 and 1 respectively. This only
-    works if the bias in each bit is constant (like in the above example).
+    Aside: If you have a constant-biased output stream like the above
+    example produces then you can re-construct an un-biased bit sequence
+    with the von neumann algorithm. This works by comparing pairs of bits.
+    If the pair consists of identical bits, it is discarded. Otherwise the
+    order of the different bits is used to determine an output bit, ie 00
+    and 11 are discarded but 01 and 10 are mapped to output bits of 0 and 1
+    respectively. This only works if the bias in each bit is constant (like
+    all characters in a Session::Token are).
 
 ALPHABET SIZE LIMITATION
     Due to a limitation in this module's code, alphabets can't be larger
@@ -272,20 +273,20 @@ SEE ALSO
     has an inflexible and unspecified (?) alphabet. It tries to get its
     source of unpredictability from UUIDs and then hashes these UUIDs with
     SHA1. I think this is bad design because some standard UUID formats
-    designed to be unpredictable at all. Knowing a target's MAC address and
-    the rough time the token was issued may help you predict a reduced area
-    of token-space to concentrate guessing attacks upon. I don't know if
-    Data::Token uses these types of UUIDs or the (potentially secure) good
-    random types, but because this wasn't addressed in the documentation and
-    because of an apparent misapplication of hash functions (if you really
-    had a good random UUID type, there would be no need to hash), I don't
-    feel good about using this module.
+    aren't designed to be unpredictable at all. Knowing a target's MAC
+    address and the rough time the token was issued may help you predict a
+    reduced area of token-space to concentrate guessing attacks upon. I
+    don't know if Data::Token uses these types of UUIDs or the potentially
+    secure "version 4" UUIDs, but because this wasn't addressed in the
+    documentation and because of an apparent misapplication of hash
+    functions (if you really had a good random UUID type, there would be no
+    need to hash), I don't feel good about using this module.
 
     There are several decent random number generators like
     Math::Random::Secure, Crypt::URandom &c, but they usually don't
     implement alphabets and some of them require you open "/dev/urandom" for
     every chunk of random bytes. Note that Math::Random::Secure does prevent
-    mod bias for its random integers though.
+    mod bias in its random integers though.
 
     String::Random is a cool module with a neat regexp-like language for
     specifying random tokens which is more flexible than alphabets. However,

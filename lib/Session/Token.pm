@@ -6,7 +6,7 @@ use Carp qw/croak/;
 use POSIX qw/ceil/;
 
 
-our $VERSION = '0.9.0';
+our $VERSION = '0.10';
 
 require XSLoader;
 XSLoader::load('Session::Token', $VERSION);
@@ -228,13 +228,13 @@ In summary, the default token length of exactly 22 characters is a consequence o
 
 Many token generation libraries, especially ones that implement custom alphabets, make the mistake of generating a random value, computing its modulus over the size of an alphabet, and then using this modulus to index into the alphabet to determine an output character.
 
-Why is this bad? Consider the alphabet C<"abc">. An ideal output probability distribution for each character in the token is:
+Why is this bad? Consider the alphabet C<"abc">. The ideal output probability distribution for each character in the token is:
 
     P(a) = 1/3
     P(b) = 1/3
     P(c) = 1/3
 
-Assume we have a uniform random number source that generates values in the set C<[0,1,2,3]> (most PRNGs provide sequences of bits, in other words power-of-2 set sizes). If we use the naïve modulus algorithm described above, C<0> maps to C<a>, C<1> maps to C<b>, C<2> maps to C<c>, and C<3> I<also> maps to C<a>. Instead of the even distribution above, we have the following biased distribution:
+Assume we have a uniform random number source that generates values in the set C<[0,1,2,3]> (most PRNGs provide sequences of bits, in other words power-of-2 size sets). If we use the naïve modulus algorithm described above, C<0> maps to C<a>, C<1> maps to C<b>, C<2> maps to C<c>, and C<3> I<also> maps to C<a>. Instead of the even distribution above, we have the following biased distribution:
 
     P(a) = 2/4 = 1/2
     P(b) = 1/4
@@ -244,7 +244,7 @@ Session::Token eliminates this bias in the above case by only using C<0>, C<1>, 
 
 Of course throwing away a portion of random data is slightly inefficient. In the worst case scenario of an alphabet with 129 characters, for each output byte this module consumes on average C<1.9845> bytes from the random number generator. This inefficiency isn't a problem because ISAAC is extremely fast.
 
-Note that if your application issues biased tokens, then some tokens are more likely than other tokens, providing a starting point for token guessing. If the tokens are unbiased, then there is no starting point since all tokens are equally likely.
+Note that if your application issues biased tokens then some tokens are more likely than other tokens which provides a starting point for token guessing. If the tokens are unbiased then all tokens are equally likely and there is no starting point.
 
 
 
@@ -254,12 +254,12 @@ If your alphabet contains the same character two or more times, this character w
 
 However, if you wish to introduce bias this library doesn't try to stop you. (Maybe it should issue a warning?)
 
-    Session::Token->new(alphabet => '0000001', length => 100000)->get; # don't do this
+    Session::Token->new(alphabet => '0000001', length => 5000)->get; # don't do this
     ## -> 0000000000010000000110000000000000000000000100...
 
 Due to a limitation discussed below, alphabets larger than 256 aren't currently supported so your bias can't get very granular.
 
-Aside: If you have a biased output stream like the above example then you can re-construct an un-biased bit sequence with the von neumann algorithm. This works by comparing pairs of bits. If the bits are identical, they are discarded. Otherwise the order of the different bits is used to determine the output bit, ie C<00> and C<11> are discarded but C<01> and C<10> are mapped to output bits of C<0> and C<1> respectively. This only works if the bias in each bit is constant (like in the above example).
+Aside: If you have a constant-biased output stream like the above example produces then you can re-construct an un-biased bit sequence with the von neumann algorithm. This works by comparing pairs of bits. If the pair consists of identical bits, it is discarded. Otherwise the order of the different bits is used to determine an output bit, ie C<00> and C<11> are discarded but C<01> and C<10> are mapped to output bits of C<0> and C<1> respectively. This only works if the bias in each bit is constant (like all characters in a Session::Token are).
 
 
 
@@ -309,9 +309,9 @@ There are lots of different modules for generating random data.
 
 Like this module, perl's C<rand()> function implements a PRNG in user-space seeded from C</dev/urandom>. However, perl C<rand()> is seeded with a mere 4 bytes from C</dev/urandom> and the perldoc doesn't seem to specify a PRNG algorithm, so I prefer not to use C<rand()> for session tokens.
 
-L<Data::Token> is the first thing I saw when I looked around on CPAN. It has an inflexible and unspecified (?) alphabet. It tries to get its source of unpredictability from UUIDs and then hashes these UUIDs with SHA1. I think this is bad design because some standard UUID formats designed to be unpredictable at all. Knowing a target's MAC address and the rough time the token was issued may help you predict a reduced area of token-space to concentrate guessing attacks upon. I don't know if Data::Token uses these types of UUIDs or the (potentially secure) good random types, but because this wasn't addressed in the documentation and because of an apparent misapplication of hash functions (if you really had a good random UUID type, there would be no need to hash), I don't feel good about using this module.
+L<Data::Token> is the first thing I saw when I looked around on CPAN. It has an inflexible and unspecified (?) alphabet. It tries to get its source of unpredictability from UUIDs and then hashes these UUIDs with SHA1. I think this is bad design because some standard UUID formats aren't designed to be unpredictable at all. Knowing a target's MAC address and the rough time the token was issued may help you predict a reduced area of token-space to concentrate guessing attacks upon. I don't know if Data::Token uses these types of UUIDs or the potentially secure "version 4" UUIDs, but because this wasn't addressed in the documentation and because of an apparent misapplication of hash functions (if you really had a good random UUID type, there would be no need to hash), I don't feel good about using this module.
 
-There are several decent random number generators like L<Math::Random::Secure>, L<Crypt::URandom> &c, but they usually don't implement alphabets and some of them require you open C</dev/urandom> for every chunk of random bytes. Note that Math::Random::Secure does prevent mod bias for its random integers though.
+There are several decent random number generators like L<Math::Random::Secure>, L<Crypt::URandom> &c, but they usually don't implement alphabets and some of them require you open C</dev/urandom> for every chunk of random bytes. Note that Math::Random::Secure does prevent mod bias in its random integers though.
 
 L<String::Random> is a cool module with a neat regexp-like language for specifying random tokens which is more flexible than alphabets. However, inspecting the code indicates that it uses perl's C<rand()>. Also, the lack of performance, bias, and security discussion in the docs made me decide to not use this otherwise very interesting module.
 
