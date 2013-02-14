@@ -31,7 +31,9 @@
          }
       },
       "runtime" : {
-         "requires" : {}
+         "requires" : {
+            "perl" : "5.008000"
+         }
       }
    },
    "release_status" : "stable",
@@ -43,5 +45,5 @@
          "url" : "git://github.com/hoytech/Session-Token.git"
       }
    },
-   "version" : "0.900"
+   "version" : "1.006"
 }
