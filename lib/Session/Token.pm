@@ -6,7 +6,7 @@ use Carp qw/croak/;
 use POSIX qw/ceil/;
 
 
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 
 require XSLoader;
 XSLoader::load('Session::Token', $VERSION);
@@ -24,7 +24,12 @@ if ($^O =~ /mswin/i) {
 
 
 sub new {
-  my ($class, %args) = @_;
+  my ($class, @args) = @_;
+
+  ## support arguments in a hash ref
+  @args = %{$args[0]} if @args == 1 && ref $args[0] eq 'HASH';
+
+  my %args = @args;
 
   my $self = {};
   bless $self, $class;
@@ -163,11 +168,11 @@ B<IMPORTANT>: If your application calls C<fork>, make sure that any generators a
 
 After the generator context is created, no system calls are used to generate tokens. This is one way that Session::Token helps with efficiency. However, this is only important for certain use cases (generally not web sessions).
 
-ISAAC is a cryptographically secure PRNG that improves on the well known RC4 algorithm in some important areas. For instance, it doesn't have short cycles like RC4 does. A theoretical shortest possible cycle in ISAAC is C<2**40>, although no cycles this short have ever been found (and probably don't exist at all). On average, ISAAC cycles are a ridiculous C<2**8295>.
+ISAAC is a cryptographically secure PRNG that improves on the well known RC4 algorithm in some important areas. For instance, it doesn't have short cycles like RC4 does. A theoretical shortest possible cycle in ISAAC is C<2**40>, although no cycles this short have ever been found (and probably don't exist at all). On average, ISAAC cycles are C<2**8295>.
 
 Creators of server applications must choose whether a single generator will be kept around and used to generate all tokens, or if a new Session::Token object will be created every time a token is needed. Using a generator may be undesirable because servers start up early after a reboot and the kernel's randomness pool might be poorly seeded at this point. For this reason, you might want to defer creating the generator until the first request comes in and/or periodically re-create the generator object. 
 
-There are good arguments for keeping the generator around, however. Probably the most important is that generating a new token cannot fail due to a full file descriptor table. Creating a new Session::Token object for every token can fail for this reason because the constructor opens C</dev/urandom>. Programs that re-use the generator are also more efficient and are less likely to cause problems in C<chroot> environments.
+There are good arguments for keeping the generator around, however. Probably the most important is that generating a new token cannot fail due to a full file descriptor table. Creating a new Session::Token object for every token can fail for this reason because the constructor opens C</dev/urandom>. Programs that re-use the generator are also more efficient and are less likely to cause problems in C<chroot>ed environments where C</dev/urandom> can no longer be opened.
 
 Aside: Some crappy (usually C) programs that assume opening C</dev/urandom> will always succeed can return session tokens based only on the contents of nulled or uninitialised memory. Unix really ought to provide a system call for random data.
 
@@ -175,7 +180,7 @@ Aside: Some crappy (usually C) programs that assume opening C</dev/urandom> will
 
 =head1 CUSTOM ALPHABETS
 
-Being able to choose exactly which characters appear in your token is sometimes useful. This set of characters is called the I<alphabet>. B<The default alphabet size is 62 characters: uppercase latin letters, lowercase latin letters, and digits> (C<a-zA-Z0-9>).
+Being able to choose exactly which characters appear in your token is sometimes useful. This set of characters is called the I<alphabet>. B<The default alphabet size is 62 characters: uppercase letters, lowercase letters, and digits> (C<a-zA-Z0-9>).
 
 For some purposes, base-62 is a sweet spot. It is more compact than hexadecimal encoding which helps with efficiency because session tokens are usually transfered over the network many times during a session (often uncompressed in HTTP headers).
 
@@ -188,6 +193,10 @@ To set a custom alphabet, just pass in either a string or an array of characters
     Session::Token->new(alphabet => '01')->get;
     Session::Token->new(alphabet => ['0', '1'])->get; # same thing
     Session::Token->new(alphabet => ['a'..'z'])->get; # character range
+
+Constructor args can be a hash-ref too:
+
+    Session::Token->new({ alphabet => ['a'..'z'] })->get;
 
 
 
@@ -228,25 +237,23 @@ In summary, the default token length of exactly 22 characters is a consequence o
 
 =head1 MOD BIAS
 
-Some token generation libraries that implement custom alphabets generate a random value, compute its modulus over the size of an alphabet, and then use this modulus to index into the alphabet to determine an output character.
+Some token generation libraries that implement custom alphabets will generate a random value, compute its modulus over the size of an alphabet, and then use this modulus to index into the alphabet to determine an output character.
 
-Why is this bad? Consider the alphabet C<"abc">. The ideal output probability distribution for each character in the token is:
+Assume we have a uniform random number source that generates values in the set C<[0,1,2,3]> (most PRNGs provide sequences of bits, in other words power-of-2 size sets) and wish to use the alphabet C<"abc">.
 
-    P(a) = 1/3
-    P(b) = 1/3
-    P(c) = 1/3
-
-Given this ideal distribution, each token has a C<1/27> chance of being generated.
-
-Assume we have a uniform random number source that generates values in the set C<[0,1,2,3]> (most PRNGs provide sequences of bits, in other words power-of-2 size sets). If we use the naïve modulus algorithm described above then C<0> maps to C<a>, C<1> maps to C<b>, C<2> maps to C<c>, and C<3> I<also> maps to C<a>. Instead of the even distribution above, we have the following biased distribution:
+If we use the naïve modulus algorithm described above then C<0> maps to C<a>, C<1> maps to C<b>, C<2> maps to C<c>, and C<3> I<also> maps to C<a>. This results in the following biased distribution for each character in the token:
 
     P(a) = 2/4 = 1/2
     P(b) = 1/4
     P(c) = 1/4
 
-Now the token C<aaa> has a C<1/8> chance, C<aab> has a C<1/16> chance, C<bbb> has a C<1/64> chance, and so on.
+Of course in an unbiased distribution, each character would have the same chance:
 
-Bias like this is bad because certain tokens are obvious starting points when token guessing. Tokens that are unbiased are equally likely and therefore there is no starting point.
+    P(a) = 1/3
+    P(b) = 1/3
+    P(c) = 1/3
+
+Bias is undesirable because certain tokens are obvious starting points when token guessing and certain other tokens are very unlikely. Tokens that are unbiased are equally likely and therefore there is no starting point with them.
 
 Session::Token provides unbiased tokens regardless of the size of your alphabet (though see the L<INTRODUCING BIAS> section for a mis-use warning). It does this in the same way that you might simulate producing unbiased random numbers from 1 to 5 given an unbiased 6-sided die: Re-roll every time a 6 comes up.
 
@@ -305,7 +312,7 @@ Aside: If you have a constant-biased output stream like the above example produc
 
 =head1 ALPHABET SIZE LIMITATION
 
-Due to a limitation in this module's code, alphabets can't be larger than 256 characters. Everywhere the above manual says "characters" it actually means bytes. This isn't a Unicode limitation per se, just the maximum size of the alphabet. If you like, you can map tokens onto new alphabets as long as they aren't more than 256 characters long. Because it is the origin of the word "alphabet", here is how to generate a 128-bit minimum entropy token using the lowercase greek alphabet (note that both forms of lowercase sigma are included which may not be desirable):
+Due to a limitation in this module's code, alphabets can't be larger than 256 characters. Everywhere the above manual says "characters" it actually means bytes. This isn't a Unicode limitation per se, just the maximum size of the alphabet. If you like, you can map tokens onto new alphabets as long as they aren't more than 256 characters long. Here is how to generate a 128-bit minimum entropy token using the lowercase greek alphabet (note that both forms of lowercase sigma are included which may not be desirable):
 
     use utf8;
     my $token = Session::Token->new(alphabet => [map {chr} 0..25])->get;
@@ -381,7 +388,7 @@ L<String::Urandom> has alphabets, but it uses the flawed mod algorithm described
 
 There are other modules like L<Data::Random>, L<App::Genpass>, L<String::MkPasswd>, L<Crypt::RandPasswd>, L<Crypt::GeneratePassword>, and L<Data::SimplePassword> but they use C<rand()>/mersenne twister, don't adequately deal with bias, and/or don't let you specify generic alphabets.
 
-L<Bytes::Random::Secure> has alphabets (aka "bags"), uses ISAAC, and avoids mod bias using the re-roll algorithm. However, it has a massive dependency tree, doesn't give any control over when its singleton generator is (re-)seeded, and is much slower than this module (even when using L<Math::Random::ISAAC::XS>). It does however support alphabets larger than C<256> and might work in environments without XS.
+L<Bytes::Random::Secure> has alphabets (aka "bags"), uses ISAAC, and avoids mod bias using the re-roll algorithm. However, it is much slower than this module (even when using L<Math::Random::ISAAC::XS>) and doesn't let you specify token-pool size by entropy. It does however support alphabets larger than C<256> and might work in environments without XS.
 
 Neil Bowers has conducted a L<3rd party review|http://neilb.org/reviews/passwords.html> of various token/password generation modules including Session::Token.
 
@@ -393,7 +400,7 @@ Doug Hoyte, C<< <doug@hcsw.org> >>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2012 Doug Hoyte.
+Copyright 2012-2013 Doug Hoyte.
 
 This module is licensed under the same terms as perl itself.
 
@@ -405,8 +412,6 @@ ISAAC code:
 
 
 
-
-__END__
 
 TODO
 

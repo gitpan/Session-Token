@@ -52,8 +52,8 @@ DESCRIPTION
     RC4 algorithm in some important areas. For instance, it doesn't have
     short cycles like RC4 does. A theoretical shortest possible cycle in
     ISAAC is "2**40", although no cycles this short have ever been found
-    (and probably don't exist at all). On average, ISAAC cycles are a
-    ridiculous "2**8295".
+    (and probably don't exist at all). On average, ISAAC cycles are
+    "2**8295".
 
     Creators of server applications must choose whether a single generator
     will be kept around and used to generate all tokens, or if a new
@@ -69,8 +69,8 @@ DESCRIPTION
     due to a full file descriptor table. Creating a new Session::Token
     object for every token can fail for this reason because the constructor
     opens "/dev/urandom". Programs that re-use the generator are also more
-    efficient and are less likely to cause problems in "chroot"
-    environments.
+    efficient and are less likely to cause problems in "chroot"ed
+    environments where "/dev/urandom" can no longer be opened.
 
     Aside: Some crappy (usually C) programs that assume opening
     "/dev/urandom" will always succeed can return session tokens based only
@@ -80,8 +80,8 @@ DESCRIPTION
 CUSTOM ALPHABETS
     Being able to choose exactly which characters appear in your token is
     sometimes useful. This set of characters is called the *alphabet*. The
-    default alphabet size is 62 characters: uppercase latin letters,
-    lowercase latin letters, and digits ("a-zA-Z0-9").
+    default alphabet size is 62 characters: uppercase letters, lowercase
+    letters, and digits ("a-zA-Z0-9").
 
     For some purposes, base-62 is a sweet spot. It is more compact than
     hexadecimal encoding which helps with efficiency because session tokens
@@ -104,6 +104,10 @@ CUSTOM ALPHABETS
         Session::Token->new(alphabet => '01')->get;
         Session::Token->new(alphabet => ['0', '1'])->get; # same thing
         Session::Token->new(alphabet => ['a'..'z'])->get; # character range
+
+    Constructor args can be a hash-ref too:
+
+        Session::Token->new({ alphabet => ['a'..'z'] })->get;
 
 ENTROPY
     There are two ways to specify the length of tokens. The most primitive
@@ -156,38 +160,35 @@ ENTROPY
     token entropy, and consistent token length.
 
 MOD BIAS
-    Some token generation libraries that implement custom alphabets generate
-    a random value, compute its modulus over the size of an alphabet, and
-    then use this modulus to index into the alphabet to determine an output
-    character.
-
-    Why is this bad? Consider the alphabet "abc". The ideal output
-    probability distribution for each character in the token is:
-
-        P(a) = 1/3
-        P(b) = 1/3
-        P(c) = 1/3
-
-    Given this ideal distribution, each token has a "1/27" chance of being
-    generated.
+    Some token generation libraries that implement custom alphabets will
+    generate a random value, compute its modulus over the size of an
+    alphabet, and then use this modulus to index into the alphabet to
+    determine an output character.
 
     Assume we have a uniform random number source that generates values in
     the set "[0,1,2,3]" (most PRNGs provide sequences of bits, in other
-    words power-of-2 size sets). If we use the naïve modulus algorithm
-    described above then 0 maps to "a", 1 maps to "b", 2 maps to "c", and 3
-    *also* maps to "a". Instead of the even distribution above, we have the
-    following biased distribution:
+    words power-of-2 size sets) and wish to use the alphabet "abc".
+
+    If we use the naïve modulus algorithm described above then 0 maps to
+    "a", 1 maps to "b", 2 maps to "c", and 3 *also* maps to "a". This
+    results in the following biased distribution for each character in the
+    token:
 
         P(a) = 2/4 = 1/2
         P(b) = 1/4
         P(c) = 1/4
 
-    Now the token "aaa" has a "1/8" chance, "aab" has a "1/16" chance, "bbb"
-    has a "1/64" chance, and so on.
+    Of course in an unbiased distribution, each character would have the
+    same chance:
 
-    Bias like this is bad because certain tokens are obvious starting points
-    when token guessing. Tokens that are unbiased are equally likely and
-    therefore there is no starting point.
+        P(a) = 1/3
+        P(b) = 1/3
+        P(c) = 1/3
+
+    Bias is undesirable because certain tokens are obvious starting points
+    when token guessing and certain other tokens are very unlikely. Tokens
+    that are unbiased are equally likely and therefore there is no starting
+    point with them.
 
     Session::Token provides unbiased tokens regardless of the size of your
     alphabet (though see the "INTRODUCING BIAS" section for a mis-use
@@ -276,11 +277,10 @@ ALPHABET SIZE LIMITATION
     than 256 characters. Everywhere the above manual says "characters" it
     actually means bytes. This isn't a Unicode limitation per se, just the
     maximum size of the alphabet. If you like, you can map tokens onto new
-    alphabets as long as they aren't more than 256 characters long. Because
-    it is the origin of the word "alphabet", here is how to generate a
-    128-bit minimum entropy token using the lowercase greek alphabet (note
-    that both forms of lowercase sigma are included which may not be
-    desirable):
+    alphabets as long as they aren't more than 256 characters long. Here is
+    how to generate a 128-bit minimum entropy token using the lowercase
+    greek alphabet (note that both forms of lowercase sigma are included
+    which may not be desirable):
 
         use utf8;
         my $token = Session::Token->new(alphabet => [map {chr} 0..25])->get;
@@ -414,11 +414,10 @@ SEE ALSO
     alphabets.
 
     Bytes::Random::Secure has alphabets (aka "bags"), uses ISAAC, and avoids
-    mod bias using the re-roll algorithm. However, it has a massive
-    dependency tree, doesn't give any control over when its singleton
-    generator is (re-)seeded, and is much slower than this module (even when
-    using Math::Random::ISAAC::XS). It does however support alphabets larger
-    than 256 and might work in environments without XS.
+    mod bias using the re-roll algorithm. However, it is much slower than
+    this module (even when using Math::Random::ISAAC::XS) and doesn't let
+    you specify token-pool size by entropy. It does however support
+    alphabets larger than 256 and might work in environments without XS.
 
     Neil Bowers has conducted a <3rd party review> of various token/password
     generation modules including Session::Token.
@@ -427,7 +426,7 @@ AUTHOR
     Doug Hoyte, "<doug@hcsw.org>"
 
 COPYRIGHT & LICENSE
-    Copyright 2012 Doug Hoyte.
+    Copyright 2012-2013 Doug Hoyte.
 
     This module is licensed under the same terms as perl itself.
 
